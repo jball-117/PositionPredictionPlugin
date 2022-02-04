@@ -34,6 +34,7 @@ private:
 	LineColor colors[2] = { {0, 255, 0, 240}, {75, 0, 130, 240} };
 	//std::vector<Hitbox> hitboxes;
 public:
+	Vector coordinates;
 	PositionPredictionPlugin();
 	~PositionPredictionPlugin();
 	virtual void onLoad();
@@ -43,6 +44,8 @@ public:
 	void OnFreeplayDestroy(std::string eventName);
 	void OnHitboxOnValueChanged(std::string oldValue, CVarWrapper cvar);
 	//void OnHitboxTypeChanged(std::string oldValue, CVarWrapper cvar);
+	//void get_coordinates(std::string &data);
+	//Vector get_coordinates(std::string data);
 	void Render(CanvasWrapper canvas);
 };
 
