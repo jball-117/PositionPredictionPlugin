@@ -12,6 +12,7 @@
 #include "RenderingTools/Objects/Frustum.h"
 #include "RenderingTools/Objects/Line.h"
 #include "RenderingTools/Objects/Sphere.h"
+#include "RenderingTools/Objects/Cone.h"
 #include "RenderingTools/Extra/WrapperStructsExtensions.h"
 #include "RenderingTools/Extra/RenderingMath.h"
 #include <sstream>
@@ -72,11 +73,11 @@ void PositionPredictionPlugin::OnFreeplayLoad(std::string eventName)
 	// get the 8 hitbox points for current car type
 	//hitboxes.clear();  // we'll reinitialize this in Render, for the first few ticks of free play, the car is null
 	//cvarManager->log(std::string("OnFreeplayLoad") + eventName);
-	if (*hitboxOn) {
+	//if (*hitboxOn) {
 		gameWrapper->RegisterDrawable(std::bind(&PositionPredictionPlugin::Render, this, std::placeholders::_1));
 		//std::thread thread_obj(&GameWrapper::RegisterDrawable, gameWrapper, std::bind(&PositionPredictionPlugin::Render, this, std::placeholders::_1));
 		//thread_obj.detach();
-	}
+	//}
 }
 
 void PositionPredictionPlugin::OnFreeplayDestroy(std::string eventName)
@@ -180,10 +181,17 @@ void get_coordinates(std::string data, Vector &coordinates) {
 	coordinates = Vector(tmp[0], tmp[1], tmp[2]);
 }
 
+Vector calc_indicator_postition(Vector me, Vector goal, double mult=1) {
+	Vector vec = goal - me;
+	float mag = vec.magnitude();
+	return Vector(me.X + (vec.X/mag*60*mult), me.Y + (vec.Y/mag*90*mult), me.Z + (vec.Z/mag*70*mult));
+}
+
 void PositionPredictionPlugin::Render(CanvasWrapper canvas)
 {	
 	int ingame = (gameWrapper->IsInGame()) ? 1 : (gameWrapper->IsInReplay()) ? 2 : 0;
-	if (*hitboxOn & ingame)
+	//if (*hitboxOn & ingame)
+	if (ingame)
 	{
 		if (gameWrapper->IsInOnlineGame() && ingame) return;
 		ServerWrapper game = (ingame == 1) ? gameWrapper->GetGameEventAsServer() : gameWrapper->GetGameEventAsReplay();
@@ -192,10 +200,17 @@ void PositionPredictionPlugin::Render(CanvasWrapper canvas)
 		if (camera.IsNull()) return;
 		RT::Frustum frust{ canvas, camera };
 		canvas.SetColor(*hitboxColor);
+		CarWrapper my_car = game.GetGameCar();
+		if (my_car.IsNull()) return;
+		Vector my_v = my_car.GetLocation();
 		///////////////////////////////////////////////////////////////////////////////////
 		if (global_render_limiter < 100) {
 			global_render_limiter++;
 			RT::Sphere(coordinates, 100.f).Draw(canvas, frust, camera.GetLocation(), 16);
+			if (!(camera.GetCameraAsActor().ContainsPoint(coordinates))) {
+				RT::Cone(calc_indicator_postition(my_v, coordinates), -1 * calc_indicator_postition(my_v, coordinates, 1.5)).Draw(canvas);
+			}
+			//RT::Sphere(calc_indicator_postition(my_v, coordinates), 3.f).Draw(canvas, frust, camera.GetLocation(), 20);
 			return;
 		}
 		else {
@@ -207,8 +222,6 @@ void PositionPredictionPlugin::Render(CanvasWrapper canvas)
 		BallWrapper ball = game.GetBall();
 		if (ball.IsNull()) return;
 		cvarManager->log(typeid(ball).name());
-		CarWrapper my_car = game.GetGameCar();
-		if (my_car.IsNull()) return;
 		cvarManager->log(typeid(my_car).name());
 		BoostWrapper my_boost = my_car.GetBoostComponent();
 		if (my_boost.IsNull()) return;
@@ -237,35 +250,63 @@ void PositionPredictionPlugin::Render(CanvasWrapper canvas)
 			//}
 
 			Vector vc = car.GetLocation();
-			Vector my_v = my_car.GetLocation();
 			Vector vb = ball.GetLocation();
 			//std::string data = std::to_string(vc.X) + "%2C" + std::to_string(vc.Y) + "%2C" + std::to_string(vc.Z)
 			//				   + "%2C" + std::to_string(boost) + "%2C" +
 			//				   std::to_string(vb.X) + "%2C" + std::to_string(vb.Y) + "%2C" + std::to_string(vb.Z);
 			
-			// normalizing
+			// normalizing and handling negative z's and negative 0's
+			// player2
 			float tmp;
-			tmp = std::round(vc.X * 10) * 0.1;
-			std::string vcX = std::to_string(tmp);
-			tmp = std::round(vc.Y* 10) * 0.1;
-			std::string vcY = std::to_string(tmp);
-			tmp = std::round(vc.Z * 10) * 0.1;
-			std::string vcZ = std::to_string(tmp);
-			tmp = std::round(my_v.X * 10) * 0.1;
-			std::string myvX = std::to_string(tmp);
-			tmp = std::round(my_v.Y * 10) * 0.1;
-			std::string myvY = std::to_string(tmp);
-			tmp = std::round(my_v.Z * 10) * 0.1;
-			std::string myvZ = std::to_string(tmp);
-			tmp = std::round(vb.X * 10) * 0.1;
-			std::string vbX = std::to_string(tmp);
-			tmp = std::round(vb.Y * 10) * 0.1;
-			std::string vbY = std::to_string(tmp);
-			tmp = std::round(vb.Z * 10) * 0.1;
-			std::string vbZ = std::to_string(tmp);
+			std::stringstream ss;
+			tmp = std::round(vc.X / 4096.0 * 10) * 0.1; tmp += 0.0;
+			ss << std::fixed << std::setprecision(1) << tmp;
+			std::string vcX = ss.str(); ss.clear(); ss.str("");
+			tmp = std::round(vc.Y / 6000.0 * 10) * 0.1; tmp += 0.0;
+			ss << std::fixed << std::setprecision(1) << tmp;
+			std::string vcY = ss.str(); ss.clear(); ss.str("");
+			tmp = std::round(vc.Z / 2044.0 * 10) * 0.1; tmp += 0.0;
+			if (tmp < 0.0) tmp = 0.0;
+			ss << std::fixed << std::setprecision(1) << tmp;
+			std::string vcZ = ss.str(); ss.clear(); ss.str("");
+			// player1
+			tmp = std::round(my_v.X / 4096.0  * 10) * 0.1; tmp += 0.0;
+			ss << std::fixed << std::setprecision(1) << tmp;
+			std::string myvX = ss.str(); ss.clear(); ss.str("");
+			tmp = std::round(my_v.Y / 6000.0  * 10) * 0.1; tmp += 0.0;
+			ss << std::fixed << std::setprecision(1) << tmp;
+			std::string myvY = ss.str(); ss.clear(); ss.str("");
+			tmp = std::round(my_v.Z / 2044.0  * 10) * 0.1; tmp += 0.0;
+			if (tmp < 0.0) tmp = 0.0;
+			ss << std::fixed << std::setprecision(1) << tmp;
+			std::string myvZ = ss.str(); ss.clear(); ss.str("");
+			// ball
+			tmp = std::round(vb.X / 4096.0  * 10) * 0.1; tmp += 0.0;
+			ss << std::fixed << std::setprecision(1) << tmp;
+			std::string vbX = ss.str(); ss.clear(); ss.str("");
+			tmp = std::round(vb.Y / 6000.0  * 10) * 0.1; tmp += 0.0;
+			ss << std::fixed << std::setprecision(1) << tmp;
+			std::string vbY = ss.str(); ss.clear(); ss.str("");
+			tmp = std::round(vb.Z / 2044.0 * 10) * 0.1; tmp += 0.0;
+			if (tmp < 0.0) tmp = 0.0;
+			ss << std::fixed << std::setprecision(1) << tmp;
+			std::string vbZ = ss.str(); ss.clear(); ss.str("");
+			// boost
+			if (boost < 0.2) boost = 0.0;
+			else if (boost < 0.4) boost = 0.2;
+			else if (boost < 0.6) boost = 0.4;
+			else if (boost < 0.8) boost = 0.6;
+			else if (boost < 1.0) boost = 0.8;
+			else boost = 0.8; // .8 is essentially full boost
+			std::string boost_str;
+			ss << std::fixed << std::setprecision(1) << boost;
+			boost_str = ss.str(); ss.clear(); ss.str("");
 
-			std::string data = vcX + "%2C" + vcY + "%2C" + vcZ + myvX + "%2C" + myvY + "%2C" + myvZ
-							   + "%2C" + std::to_string(boost) + "%2C" + vbX + "%2C" + vbY + "%2C" + vbZ;
+			//std::string data = vcX + "%2C" + vcY + "%2C" + vcZ + "%2C" + myvX + "%2C" + myvY + "%2C" + myvZ
+			//				   + "%2C" + boost_str + "%2C" + vbX + "%2C" + vbY + "%2C" + vbZ;
+			// OLD VERSION. MAKING NEW MODELS NOW
+			std::string data = vcX + "%2C" + vcY + "%2C" + vcZ
+							   + "%2C" + boost_str + "%2C" + vbX + "%2C" + vbY + "%2C" + vbZ;
 			
 			//Rotator r = car.GetRotation();
 			
@@ -276,6 +317,10 @@ void PositionPredictionPlugin::Render(CanvasWrapper canvas)
 			thread_obj.detach();
 			cvarManager->log("Drawing...\n");
 			RT::Sphere(coordinates, 100.f).Draw(canvas, frust, camera.GetLocation(), 16);
+			if (!(camera.GetCameraAsActor().ContainsPoint(coordinates))) {
+				RT::Cone(calc_indicator_postition(my_v, coordinates), -1 * calc_indicator_postition(my_v, coordinates, 1.5)).Draw(canvas);
+			}
+			//RT::Sphere(calc_indicator_postition(my_v, coordinates), 3.f).Draw(canvas, frust, camera.GetLocation(), 20);
 			cvarManager->log("Done Drawing.\n");
 
 			//double dPitch = (double)r.Pitch / 32768.0 * 3.14159;

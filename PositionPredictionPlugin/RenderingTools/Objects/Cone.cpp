@@ -6,7 +6,7 @@
 #include <vector>
 
 RT::Cone::Cone()
-	: location(Vector()), direction(Vector(0,0,1)), radius(5), height(20), rollAmount(0), segments(8), thickness(1) {}
+	: location(Vector()), direction(Vector(0,0,1)), radius(5), height(20), rollAmount(0), segments(20), thickness(1) {}
 
 RT::Cone::Cone(Vector loc, Vector dir)
 	: Cone() { location = loc; direction = dir; }
