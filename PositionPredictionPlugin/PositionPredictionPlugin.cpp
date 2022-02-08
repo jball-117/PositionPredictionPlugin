@@ -207,7 +207,8 @@ void PositionPredictionPlugin::Render(CanvasWrapper canvas)
 		if (global_render_limiter < 100) {
 			global_render_limiter++;
 			RT::Sphere(coordinates, 100.f).Draw(canvas, frust, camera.GetLocation(), 16);
-			if (!(camera.GetCameraAsActor().ContainsPoint(coordinates))) {
+			//if (!(camera.GetCameraAsActor().ContainsPoint(coordinates))) {
+			if (!(frust.IsInFrustum(coordinates))) {
 				RT::Cone(calc_indicator_postition(my_v, coordinates), -1 * calc_indicator_postition(my_v, coordinates, 1.5)).Draw(canvas);
 			}
 			//RT::Sphere(calc_indicator_postition(my_v, coordinates), 3.f).Draw(canvas, frust, camera.GetLocation(), 20);
@@ -317,7 +318,8 @@ void PositionPredictionPlugin::Render(CanvasWrapper canvas)
 			thread_obj.detach();
 			cvarManager->log("Drawing...\n");
 			RT::Sphere(coordinates, 100.f).Draw(canvas, frust, camera.GetLocation(), 16);
-			if (!(camera.GetCameraAsActor().ContainsPoint(coordinates))) {
+			//if (!(camera.GetCameraAsActor().ContainsPoint(coordinates))) {
+			if (!(frust.IsInFrustum(coordinates))) {
 				RT::Cone(calc_indicator_postition(my_v, coordinates), -1 * calc_indicator_postition(my_v, coordinates, 1.5)).Draw(canvas);
 			}
 			//RT::Sphere(calc_indicator_postition(my_v, coordinates), 3.f).Draw(canvas, frust, camera.GetLocation(), 20);
